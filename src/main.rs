@@ -53,29 +53,23 @@ fn is_valid_contact_number(contact_number: &str) -> bool {
 }
 
 fn take_and_validate_email_input() -> String {
-    let mut email;
     loop {
-        email = take_input("Enter email: ");
-        if !is_valid_email(email.as_str()) {
-            println!("Invalid email, please enter again");
-            continue;
+        let email = take_input("Enter email: ");
+        if is_valid_email(email.as_str()) {
+            return email;
         }
-        break;
+        println!("Invalid email, please enter again");
     }
-    email
 }
 
 fn take_and_validate_contact_number_input() -> String {
-    let mut contact_number;
     loop {
-        contact_number = take_input("Enter contact number: ");
-        if !is_valid_contact_number(contact_number.as_str()) {
-            println!("Invalid contact number, please enter again");
-            continue;
+        let contact_number = take_input("Enter contact number: ");
+        if is_valid_contact_number(contact_number.as_str()) {
+            return contact_number;
         }
-        break;
+        println!("Invalid contact number, please enter again");
     }
-    contact_number
 }
 
 fn add_to_contacts(directory: &mut HashMap<String, Contact>) {
