@@ -38,17 +38,13 @@ fn is_valid_email(email: &str) -> bool {
 
     // If the username or domain contains any character that is
     // not a letter, a digit, a ".", a "_" or a "-", the function returns false.
-    if !username
+    // last condition to check, return true/false from here
+    username
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
         || !domain
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
-    {
-        return false;
-    }
-
-    true
 }
 
 fn is_valid_contact_number(contact_number: &str) -> bool {
