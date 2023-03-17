@@ -52,15 +52,8 @@ fn is_valid_email(email: &str) -> bool {
 }
 
 fn is_valid_contact_number(contact_number: &str) -> bool {
-    // Check if the contact number has only digits
-    for digit in contact_number.chars() {
-        if !digit.is_digit(10) {
-            return false;
-        }
-    }
-
-    // Check if the number has exactly 10 digits
-    contact_number.len() == 10
+    // Check if the contact number has only digits and exactly 10 digits
+    contact_number.chars().all(|c| c.is_digit(10)) && contact_number.len() == 10
 }
 
 fn take_and_validate_email_input() -> String {
