@@ -113,10 +113,13 @@ fn update_contacts(directory: &mut HashMap<String, Contact>) {
 
 fn delete_contact(directory: &mut HashMap<String, Contact>) {
     let name = take_input("Enter name: ");
-    if let Some(val) = directory.remove(&name) {
-        println!("Deleted contact -> {:?}", val);
-    } else {
-        println!("name not found in directory");
+    match directory.remove(&name) {
+        Some(contact) => {
+            println!("Deleted contact -> {:?}", contact);
+        }
+        None => {
+            println!("Name: {} not found in directory", name);
+        }
     }
 }
 
