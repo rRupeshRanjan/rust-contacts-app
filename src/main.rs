@@ -126,7 +126,10 @@ fn delete_contact(directory: &mut HashMap<String, Contact>) {
 fn get_contacts_by_page(directory: &HashMap<String, Contact>) {
     let page_num = take_input("Enter page number: ")
         .parse::<usize>()
-        .unwrap_or(1);
+        .unwrap_or_else(|_| {
+            println!("Invalid page number passed, defaulting to 1");
+            1
+        });
 
     let start_index: usize = (page_num - 1) * PAGE_SIZE;
 
