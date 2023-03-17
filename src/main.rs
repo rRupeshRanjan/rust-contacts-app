@@ -38,29 +38,18 @@ fn is_valid_email(email: &str) -> bool {
 
     // If the username or domain contains any character that is
     // not a letter, a digit, a ".", a "_" or a "-", the function returns false.
-    if !username
+    // last condition to check, return true/false from here
+    username
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
         || !domain
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.')
-    {
-        return false;
-    }
-
-    true
 }
 
 fn is_valid_contact_number(contact_number: &str) -> bool {
-    // Check if the contact number has only digits
-    for digit in contact_number.chars() {
-        if !digit.is_digit(10) {
-            return false;
-        }
-    }
-
-    // Check if the number has exactly 10 digits
-    contact_number.len() == 10
+    // Check if the contact number has only digits and exactly 10 digits
+    contact_number.chars().all(|c| c.is_digit(10)) && contact_number.len() == 10
 }
 
 fn take_and_validate_email_input() -> String {
@@ -124,17 +113,23 @@ fn update_contacts(directory: &mut HashMap<String, Contact>) {
 
 fn delete_contact(directory: &mut HashMap<String, Contact>) {
     let name = take_input("Enter name: ");
-    if let Some(val) = directory.remove(&name) {
-        println!("Deleted contact -> {:?}", val);
-    } else {
-        println!("name not found in directory");
+    match directory.remove(&name) {
+        Some(contact) => {
+            println!("Deleted contact -> {:?}", contact);
+        }
+        None => {
+            println!("Name: {} not found in directory", name);
+        }
     }
 }
 
 fn get_contacts_by_page(directory: &HashMap<String, Contact>) {
     let page_num = take_input("Enter page number: ")
         .parse::<usize>()
-        .unwrap_or(1);
+        .unwrap_or_else(|_| {
+            println!("Invalid page number passed, defaulting to 1");
+            1
+        });
 
     let start_index: usize = (page_num - 1) * PAGE_SIZE;
 
