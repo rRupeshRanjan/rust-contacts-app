@@ -3,17 +3,17 @@ use crate::contacts_service::{ContactsService, InMemoryConytactsService};
 
 fn main() {
     let name = "Rupesh".to_string();
-    let email = "rupeshranjan@meta.com".to_string();
-    let phone_number = "310625484781".to_string();
+    let email = "rupesh@mta.com".to_string();
+    let phone_number = "311234567890".to_string();
     let mut contacts = InMemoryConytactsService::new();
 
     let _ = contacts.add(name.clone(), email.clone(), phone_number.clone());
     println!("{:?}", contacts);
 
-    let _ = contacts.update_email(name.clone(), "rup@meta.com".to_string());
+    let _ = contacts.update_email(name.clone(), "rup@met.com".to_string());
     println!("{:?}", contacts);
 
-    let _ = contacts.update_phone(name.clone(), "310625484782".to_string());
+    let _ = contacts.update_phone(name.clone(), "311234567891".to_string());
     println!("{:?}", contacts);
 
     match contacts.get_by_name(name.clone()) {
