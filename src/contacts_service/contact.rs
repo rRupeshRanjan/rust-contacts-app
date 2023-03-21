@@ -1,4 +1,7 @@
-#[derive(Debug)]
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Serialize, Deserialize)]
 pub struct Contact {
     pub name: String,
     pub email: String,

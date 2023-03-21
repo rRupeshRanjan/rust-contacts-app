@@ -1,8 +1,11 @@
 mod contact;
-use contact::Contact;
 use std::collections::BTreeMap;
 
+use contact::Contact;
 use regex::Regex;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_json;
 
 const NL_PHONE_NUMBER_REGEX: &str = r"31[0-9]{9,10}";
 const EMAIL_REGEX: &str =
@@ -13,11 +16,11 @@ pub trait ContactsService {
     fn update_email(&mut self, name: String, email: String) -> Result<bool, String>;
     fn update_phone(&mut self, name: String, phone_number: String) -> Result<bool, String>;
     fn delete(&mut self, name: String) -> Option<Contact>;
-    fn get_by_name(&mut self, name: String) -> Option<&Contact>;
-    fn get_all(&mut self, page_num: usize, page_size: usize) -> Vec<&Contact>;
+    fn get_by_name(&mut self, name: String) -> String;
+    fn get_all(&mut self, page_num: usize, page_size: usize) -> String;
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
 pub struct InMemoryConytactsService {
     contacts: BTreeMap<String, Contact>,
 }
@@ -68,9 +71,9 @@ impl ContactsService for InMemoryConytactsService {
                 self.contacts.insert(
                     name.clone(),
                     Contact {
-                        name: name,
-                        email: email,
-                        phone_number: phone_number,
+                        name,
+                        email,
+                        phone_number,
                     },
                 );
                 return Ok(());
@@ -132,15 +135,21 @@ impl ContactsService for InMemoryConytactsService {
         self.contacts.remove(&name)
     }
 
-    fn get_by_name(&mut self, name: String) -> Option<&Contact> {
-        self.contacts.get(&name)
+    fn get_by_name(&mut self, name: String) -> String {
+        match self.contacts.get(&name) {
+            Some(contact) => serde_json::to_string(contact).unwrap(),
+            None => "No contact found by name".to_string(),
+        }
     }
 
-    fn get_all(&mut self, page_num: usize, page_size: usize) -> Vec<&Contact> {
-        self.contacts
+    fn get_all(&mut self, page_num: usize, page_size: usize) -> String {
+        let contacts: Vec<&Contact> = self
+            .contacts
             .values()
             .skip(page_num * page_size)
             .take(page_size)
-            .collect()
+            .collect();
+
+        serde_json::to_string(&contacts).unwrap()
     }
 }

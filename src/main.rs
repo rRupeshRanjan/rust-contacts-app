@@ -1,7 +1,9 @@
 pub mod contacts_service;
-use std::{io, usize};
+use std::io;
+use std::usize;
 
-use crate::contacts_service::{ContactsService, InMemoryConytactsService};
+use crate::contacts_service::ContactsService;
+use crate::contacts_service::InMemoryConytactsService;
 
 const INPUT_SELECTION_MESSAGE: &str = "Choose your action -
 1. Add to contacts
@@ -64,7 +66,7 @@ fn main() {
                 match page_num.parse::<usize>() {
                     Ok(page_num) => match page_size.parse::<usize>() {
                         Ok(page_size) => {
-                            println!("{:?}", contacts.get_all(page_num, page_size));
+                            println!("{}", contacts.get_all(page_num, page_size));
                         }
                         Err(err) => panic!("{}", err.to_string()),
                     },
@@ -73,10 +75,7 @@ fn main() {
             }
             "6" => {
                 let name = take_input("Enter name:");
-                match contacts.get_by_name(name) {
-                    Some(contact) => print!("{:?}", contact),
-                    None => println! {"No contact found"},
-                }
+                println!("{}", contacts.get_by_name(name));
             }
             _ => println!("Invalid input, please enter inputs from 1-6"),
         }
