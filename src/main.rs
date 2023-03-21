@@ -1,34 +1,94 @@
 pub mod contacts_service;
+use std::{io, usize};
+
 use crate::contacts_service::{ContactsService, InMemoryConytactsService};
 
+const INPUT_SELECTION_MESSAGE: &str = "Choose your action -
+1. Add to contacts
+2. Update contact email
+3. Update contact number
+4. Delete contact
+5. See all contacts
+6. See contact by name";
+
+fn take_input(message: &str) -> String {
+    println!("{}", message);
+    let mut entry = String::new();
+    io::stdin()
+        .read_line(&mut entry)
+        .expect("Failed to read line");
+
+    entry.trim().to_string()
+}
+
 fn main() {
-    let name = "Rupesh".to_string();
-    let email = "rupesh@mta.com".to_string();
-    let phone_number = "311234567890".to_string();
     let mut contacts = InMemoryConytactsService::new();
 
-    let _ = contacts.add(name.clone(), email.clone(), phone_number.clone());
-    println!("{:?}", contacts);
+    loop {
+        let input = take_input(INPUT_SELECTION_MESSAGE);
 
-    let _ = contacts.update_email(name.clone(), "rup@met.com".to_string());
-    println!("{:?}", contacts);
+        match input.as_str() {
+            "1" => {
+                let name = take_input("Enter name:");
+                let email = take_input("Enter email:");
+                let phone_number = take_input("Enter phone number:");
+                match contacts.add(name, email, phone_number) {
+                    Ok(_) => println!("contact added to directory"),
+                    Err(err) => panic!("{}", err.to_string()),
+                }
+            }
+            "2" => {
+                let name = take_input("Enter name:");
+                let email = take_input("Enter email:");
+                match contacts.update_email(name, email) {
+                    Ok(_) => println!("updated email"),
+                    Err(err) => panic!("{}", err.to_string()),
+                }
+            }
+            "3" => {
+                let name = take_input("Enter name:");
+                let phone_number = take_input("Enter phone number:");
+                match contacts.update_phone(name, phone_number) {
+                    Ok(_) => println!("updated phone number"),
+                    Err(err) => panic!("{}", err.to_string()),
+                }
+            }
+            "4" => {
+                let name = take_input("Enter name:");
+                contacts.delete(name);
+            }
+            "5" => {
+                let page_num = take_input("Enter page number (starts from 0): ");
+                let page_size = take_input("Enter page size: ");
 
-    let _ = contacts.update_phone(name.clone(), "311234567891".to_string());
-    println!("{:?}", contacts);
-
-    match contacts.get_by_name(name.clone()) {
-        Some(contact) => {
-            println!("{:?}", contact)
+                match page_num.parse::<usize>() {
+                    Ok(page_num) => match page_size.parse::<usize>() {
+                        Ok(page_size) => {
+                            println!("{:?}", contacts.get_all(page_num, page_size));
+                        }
+                        Err(err) => panic!("{}", err.to_string()),
+                    },
+                    Err(err) => panic!("{}", err.to_string()),
+                }
+            }
+            "6" => {
+                let name = take_input("Enter name:");
+                match contacts.get_by_name(name) {
+                    Some(contact) => print!("{:?}", contact),
+                    None => println! {"No contact found"},
+                }
+            }
+            _ => println!("Invalid input, please enter inputs from 1-6"),
         }
-        None => println!("No contact found by name: {}", name.clone()),
-    }
 
-    match contacts.get_by_name("rakesh".to_string()) {
-        Some(contact) => {
-            println!("{:?}", contact)
-        }
-        None => println!("No contact found by name: {}", "rakesh".to_string()),
+        let is_next_entry = take_input("Do you want to coninue?(y/n)");
+        match is_next_entry.to_lowercase().as_str() {
+            "yes" | "y" => continue,
+            "no" | "n" => break,
+            _ => {
+                println!("Invalid input, please enter 'yes' or 'no'");
+                break;
+            }
+        };
     }
-
-    println!("{:?}", contacts.get_all(0, 1));
 }
