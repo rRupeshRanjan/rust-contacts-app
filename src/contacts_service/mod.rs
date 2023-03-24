@@ -13,6 +13,13 @@ const NL_PHONE_NUMBER_REGEX: &str = r"31[0-9]{9,10}";
 const EMAIL_REGEX: &str =
     r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})";
 const EMPTY_PARAMS: &[&dyn ToSql] = &[] as &[&dyn ToSql];
+const INSERT_CONTACT_QUERY: &str =
+    "INSERT INTO contacts (name, email, phone_number) VALUES (?1, ?2, ?3)";
+const UPDATE_EMAIL_QUERY: &str = "UPDATE contacts SET email = ?1 WHERE name = ?2";
+const UPDATE_PHONE_QUERY: &str = "UPDATE contacts SET phone_number = ?1 WHERE name = ?2";
+const DLETE_CONTACT_QUERY: &str = "DELETE FROM contacts WHERE name = ?1";
+const GET_BY_NAME_QUERY: &str = "SELECT name, email, phone_number FROM contacts WHERE name = ?1";
+const GET_ALL_QUERY: &str = "SELECT name, email, phone_number FROM contacts LIMIT ?1 OFFSET ?2";
 
 pub trait ContactsService {
     fn add(
@@ -123,10 +130,7 @@ impl ContactsService for SqlContactsService {
     ) -> Result<(), ContactsError> {
         Self::validate_input(&name, Some(&email), Some(&phone_number_as_str))?;
 
-        let mut stmt = self
-            .conn
-            .prepare("INSERT INTO contacts (name, email, phone_number) VALUES (?1, ?2, ?3)")?;
-
+        let mut stmt = self.conn.prepare(INSERT_CONTACT_QUERY)?;
         match stmt.execute(&[name, email, phone_number_as_str]) {
             Ok(_) => Ok(()),
             Err(err) => Err(ContactsError::SqliteError(err)),
@@ -136,10 +140,7 @@ impl ContactsService for SqlContactsService {
     fn update_email(&mut self, name: String, email: String) -> Result<(), ContactsError> {
         Self::validate_input(&name, Some(&email), None)?;
 
-        let mut stmt = self
-            .conn
-            .prepare("UPDATE contacts SET email = ?1 WHERE name = ?2")?;
-
+        let mut stmt = self.conn.prepare(UPDATE_EMAIL_QUERY)?;
         match stmt.execute(&[email, name.clone()]) {
             Ok(rows_affected) => {
                 if rows_affected == 0 {
@@ -158,10 +159,7 @@ impl ContactsService for SqlContactsService {
     fn update_phone(&mut self, name: String, phone_number: String) -> Result<(), ContactsError> {
         Self::validate_input(&name, None, Some(&phone_number))?;
 
-        let mut stmt = self
-            .conn
-            .prepare("UPDATE contacts SET phone_number = ?1 WHERE name = ?2")?;
-
+        let mut stmt = self.conn.prepare(UPDATE_PHONE_QUERY)?;
         match stmt.execute(&[phone_number, name.clone()]) {
             Ok(rows_affected) => {
                 if rows_affected == 0 {
@@ -178,7 +176,7 @@ impl ContactsService for SqlContactsService {
     }
 
     fn delete(&mut self, name: String) -> Result<(), ContactsError> {
-        let mut stmt = self.conn.prepare("DELETE FROM contacts WHERE name = ?1")?;
+        let mut stmt = self.conn.prepare(DLETE_CONTACT_QUERY)?;
         match stmt.execute(&[name]) {
             Ok(_) => Ok(()),
             Err(err) => Err(ContactsError::SqliteError(err)),
@@ -186,10 +184,7 @@ impl ContactsService for SqlContactsService {
     }
 
     fn get_by_name(&mut self, name: String) -> Result<String, ContactsError> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name, email, phone_number FROM contacts WHERE name = ?1")?;
-
+        let mut stmt = self.conn.prepare(GET_BY_NAME_QUERY)?;
         let mut rows = stmt.query(&[name])?;
 
         if let Some(row) = rows.next()? {
@@ -205,9 +200,7 @@ impl ContactsService for SqlContactsService {
     }
 
     fn get_all(&mut self, page_num: usize, page_size: usize) -> Result<String, ContactsError> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT name, email, phone_number FROM contacts LIMIT ?1 OFFSET ?2")?;
+        let mut stmt = self.conn.prepare(GET_ALL_QUERY)?;
 
         let contact_iter =
             stmt.query_map(&[page_size as i64, (page_num * page_size) as i64], |row| {
