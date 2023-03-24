@@ -1,6 +1,5 @@
 mod contact;
 mod contact_error;
-use std::error;
 
 use rusqlite::{Connection, Result, ToSql};
 
@@ -25,12 +24,8 @@ pub trait ContactsService {
     fn update_email(&mut self, name: String, email: String) -> Result<(), ContactsError>;
     fn update_phone(&mut self, name: String, phone_number: String) -> Result<(), ContactsError>;
     fn delete(&mut self, name: String) -> Result<(), ContactsError>;
-    fn get_by_name(&mut self, name: String) -> Result<String, Box<dyn error::Error>>;
-    fn get_all(
-        &mut self,
-        page_num: usize,
-        page_size: usize,
-    ) -> Result<String, Box<dyn error::Error>>;
+    fn get_by_name(&mut self, name: String) -> Result<String, ContactsError>;
+    fn get_all(&mut self, page_num: usize, page_size: usize) -> Result<String, ContactsError>;
 }
 
 pub struct SqlContactsService {
@@ -190,7 +185,7 @@ impl ContactsService for SqlContactsService {
         }
     }
 
-    fn get_by_name(&mut self, name: String) -> Result<String, Box<dyn error::Error>> {
+    fn get_by_name(&mut self, name: String) -> Result<String, ContactsError> {
         let mut stmt = self
             .conn
             .prepare("SELECT name, email, phone_number FROM contacts WHERE name = ?1")?;
@@ -203,17 +198,13 @@ impl ContactsService for SqlContactsService {
                 email: row.get(1)?,
                 phone_number: row.get(2)?,
             };
-            serde_json::to_string(&contact).map_err(Box::<dyn error::Error>::from)
+            serde_json::to_string(&contact).map_err(|err| ContactsError::SerdeError(err))
         } else {
             Ok("No contact found by name".to_string())
         }
     }
 
-    fn get_all(
-        &mut self,
-        page_num: usize,
-        page_size: usize,
-    ) -> Result<String, Box<dyn error::Error>> {
+    fn get_all(&mut self, page_num: usize, page_size: usize) -> Result<String, ContactsError> {
         let mut stmt = self
             .conn
             .prepare("SELECT name, email, phone_number FROM contacts LIMIT ?1 OFFSET ?2")?;
@@ -229,6 +220,6 @@ impl ContactsService for SqlContactsService {
 
         let contacts: Result<Vec<_>, rusqlite::Error> = contact_iter.collect();
         let contacts = contacts?;
-        serde_json::to_string(&contacts).map_err(Box::<dyn error::Error>::from)
+        serde_json::to_string(&contacts).map_err(|err| ContactsError::SerdeError(err))
     }
 }
