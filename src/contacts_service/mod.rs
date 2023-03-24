@@ -1,43 +1,114 @@
 mod contact;
-use std::collections::BTreeMap;
+mod contact_error;
+use std::error;
+
+use rusqlite::{Connection, Result, ToSql};
 
 use contact::Contact;
 use regex::Regex;
-use serde::Deserialize;
-use serde::Serialize;
 use serde_json;
+
+use self::contact_error::ContactsError;
 
 const NL_PHONE_NUMBER_REGEX: &str = r"31[0-9]{9,10}";
 const EMAIL_REGEX: &str =
     r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})";
+const EMPTY_PARAMS: &[&dyn ToSql] = &[] as &[&dyn ToSql];
 
 pub trait ContactsService {
-    fn add(&mut self, name: String, email: String, phone_number: String) -> Result<(), String>;
-    fn update_email(&mut self, name: String, email: String) -> Result<bool, String>;
-    fn update_phone(&mut self, name: String, phone_number: String) -> Result<bool, String>;
-    fn delete(&mut self, name: String) -> Option<Contact>;
-    fn get_by_name(&mut self, name: String) -> String;
-    fn get_all(&mut self, page_num: usize, page_size: usize) -> String;
+    fn add(
+        &mut self,
+        name: String,
+        email: String,
+        phone_number: String,
+    ) -> Result<(), ContactsError>;
+    fn update_email(&mut self, name: String, email: String) -> Result<(), ContactsError>;
+    fn update_phone(&mut self, name: String, phone_number: String) -> Result<(), ContactsError>;
+    fn delete(&mut self, name: String) -> Result<(), ContactsError>;
+    fn get_by_name(&mut self, name: String) -> Result<String, Box<dyn error::Error>>;
+    fn get_all(
+        &mut self,
+        page_num: usize,
+        page_size: usize,
+    ) -> Result<String, Box<dyn error::Error>>;
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct InMemoryConytactsService {
-    contacts: BTreeMap<String, Contact>,
+pub struct SqlContactsService {
+    conn: Connection,
 }
 
-impl InMemoryConytactsService {
-    pub fn new() -> Self {
-        InMemoryConytactsService {
-            contacts: BTreeMap::new(),
+impl SqlContactsService {
+    pub fn new() -> Result<Self> {
+        let conn = Connection::open("../contacts.db")?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS contacts (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone_number BIGINT NOT NULL
+        )",
+            EMPTY_PARAMS,
+        )?;
+        Ok(SqlContactsService { conn })
+    }
+
+    fn validate_input(
+        name: &String,
+        email: Option<&String>,
+        phone_number: Option<&String>,
+    ) -> Result<(), ContactsError> {
+        if name.is_empty() {
+            return Err(ContactsError::InputError("Name cannot be empty".to_owned()));
         }
+
+        if let Some(email) = email {
+            match Self::is_valid_email(email) {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(ContactsError::InputError(format!(
+                        "Invalid email entered: {}",
+                        email
+                    )));
+                }
+                Err(err) => {
+                    return Err(ContactsError::InputError(format!(
+                        "Failed to validate email: {}",
+                        err
+                    )));
+                }
+            }
+        }
+
+        if let Some(phone) = phone_number {
+            match Self::is_valid_phone(phone) {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(ContactsError::InputError(format!(
+                        "Invalid phone number entered: {}",
+                        phone
+                    )));
+                }
+                Err(err) => {
+                    return Err(ContactsError::InputError(format!(
+                        "Failed to validate phone number: {}",
+                        err
+                    )));
+                }
+            }
+        }
+
+        Ok(())
     }
 
-    fn is_valid_email(text: &String) -> Result<bool, regex::Error> {
+    fn is_valid_email(text: &String) -> Result<bool, ContactsError> {
         Self::is_valid_regex(text, EMAIL_REGEX)
+            .map_err(|_| ContactsError::InputError("Invalid email regex".to_owned()))
     }
 
-    fn is_valid_phone(text: &String) -> Result<bool, regex::Error> {
+    fn is_valid_phone(text: &String) -> Result<bool, ContactsError> {
         Self::is_valid_regex(text, NL_PHONE_NUMBER_REGEX)
+            .map_err(|_| ContactsError::InputError("Invalid phone number regex".to_owned()))
     }
 
     fn is_valid_regex(text: &String, regex: &str) -> Result<bool, regex::Error> {
@@ -48,108 +119,116 @@ impl InMemoryConytactsService {
     }
 }
 
-impl ContactsService for InMemoryConytactsService {
+impl ContactsService for SqlContactsService {
     fn add(
         &mut self,
         name: String,
         email: String,
         phone_number_as_str: String,
-    ) -> Result<(), String> {
-        if name.is_empty() {
-            return Err("Name cannot be empty".to_string());
-        }
+    ) -> Result<(), ContactsError> {
+        Self::validate_input(&name, Some(&email), Some(&phone_number_as_str))?;
 
-        match Regex::new(NL_PHONE_NUMBER_REGEX) {
-            Ok(x) => {
-                assert!(x.is_match(&phone_number_as_str))
-            }
-            Err(_) => panic!("Incorrect phone number provided"),
-        }
+        let mut stmt = self
+            .conn
+            .prepare("INSERT INTO contacts (name, email, phone_number) VALUES (?1, ?2, ?3)")?;
 
-        match phone_number_as_str.parse::<u64>() {
-            Ok(phone_number) => {
-                self.contacts.insert(
-                    name.clone(),
-                    Contact {
-                        name,
-                        email,
-                        phone_number,
-                    },
-                );
-                return Ok(());
-            }
-            Err(err) => return Err(err.to_string()),
+        match stmt.execute(&[name, email, phone_number_as_str]) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(ContactsError::SqliteError(err)),
         }
     }
 
-    fn update_email(&mut self, name: String, email: String) -> Result<bool, String> {
-        if name.is_empty() {
-            return Err("Name cannot be empty".to_string());
-        }
+    fn update_email(&mut self, name: String, email: String) -> Result<(), ContactsError> {
+        Self::validate_input(&name, Some(&email), None)?;
 
-        match Self::is_valid_email(&email) {
-            Ok(is_valid_email) => {
-                if !is_valid_email {
-                    return Err("invalid email entered".to_string());
+        let mut stmt = self
+            .conn
+            .prepare("UPDATE contacts SET email = ?1 WHERE name = ?2")?;
+
+        match stmt.execute(&[email, name.clone()]) {
+            Ok(rows_affected) => {
+                if rows_affected == 0 {
+                    return Err(ContactsError::InputError(format!(
+                        "No contact found with name {}",
+                        name
+                    )));
                 }
+                println!("{} contact(s) updated", rows_affected);
+                Ok(())
             }
-            Err(err) => return Err(err.to_string()),
-        }
-
-        match self.contacts.get_mut(&name) {
-            Some(contact) => {
-                contact.email = email;
-                return Ok(true);
-            }
-            None => Ok(false),
+            Err(err) => Err(ContactsError::SqliteError(err)),
         }
     }
 
-    fn update_phone(&mut self, name: String, phone_number: String) -> Result<bool, String> {
-        if name.is_empty() {
-            return Err("name cannot be empty".to_string());
-        }
+    fn update_phone(&mut self, name: String, phone_number: String) -> Result<(), ContactsError> {
+        Self::validate_input(&name, None, Some(&phone_number))?;
 
-        match Self::is_valid_phone(&phone_number) {
-            Ok(is_valid_phone) => {
-                if !is_valid_phone {
-                    return Err("Invalid phone number entered".to_string());
+        let mut stmt = self
+            .conn
+            .prepare("UPDATE contacts SET phone_number = ?1 WHERE name = ?2")?;
+
+        match stmt.execute(&[phone_number, name.clone()]) {
+            Ok(rows_affected) => {
+                if rows_affected == 0 {
+                    return Err(ContactsError::InputError(format!(
+                        "No contact found with name {}",
+                        name
+                    )));
                 }
+                println!("{} contact(s) updated", rows_affected);
+                Ok(())
             }
-            Err(err) => return Err(err.to_string()),
-        }
-
-        match phone_number.parse::<u64>() {
-            Ok(new_phone_number) => match self.contacts.get_mut(&name) {
-                Some(contact) => {
-                    contact.phone_number = new_phone_number;
-                    return Ok(true);
-                }
-                None => return Ok(false),
-            },
-            Err(err) => return Err(err.to_string()),
+            Err(err) => Err(ContactsError::SqliteError(err)),
         }
     }
 
-    fn delete(&mut self, name: String) -> Option<Contact> {
-        self.contacts.remove(&name)
-    }
-
-    fn get_by_name(&mut self, name: String) -> String {
-        match self.contacts.get(&name) {
-            Some(contact) => serde_json::to_string(contact).unwrap(),
-            None => "No contact found by name".to_string(),
+    fn delete(&mut self, name: String) -> Result<(), ContactsError> {
+        let mut stmt = self.conn.prepare("DELETE FROM contacts WHERE name = ?1")?;
+        match stmt.execute(&[name]) {
+            Ok(_) => Ok(()),
+            Err(err) => Err(ContactsError::SqliteError(err)),
         }
     }
 
-    fn get_all(&mut self, page_num: usize, page_size: usize) -> String {
-        let contacts: Vec<&Contact> = self
-            .contacts
-            .values()
-            .skip(page_num * page_size)
-            .take(page_size)
-            .collect();
+    fn get_by_name(&mut self, name: String) -> Result<String, Box<dyn error::Error>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT name, email, phone_number FROM contacts WHERE name = ?1")?;
 
-        serde_json::to_string(&contacts).unwrap()
+        let mut rows = stmt.query(&[name])?;
+
+        if let Some(row) = rows.next()? {
+            let contact = Contact {
+                name: row.get(0)?,
+                email: row.get(1)?,
+                phone_number: row.get(2)?,
+            };
+            serde_json::to_string(&contact).map_err(Box::<dyn error::Error>::from)
+        } else {
+            Ok("No contact found by name".to_string())
+        }
+    }
+
+    fn get_all(
+        &mut self,
+        page_num: usize,
+        page_size: usize,
+    ) -> Result<String, Box<dyn error::Error>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT name, email, phone_number FROM contacts LIMIT ?1 OFFSET ?2")?;
+
+        let contact_iter =
+            stmt.query_map(&[page_size as i64, (page_num * page_size) as i64], |row| {
+                Ok(Contact {
+                    name: row.get(0)?,
+                    email: row.get(1)?,
+                    phone_number: row.get(2)?,
+                })
+            })?;
+
+        let contacts: Result<Vec<_>, rusqlite::Error> = contact_iter.collect();
+        let contacts = contacts?;
+        serde_json::to_string(&contacts).map_err(Box::<dyn error::Error>::from)
     }
 }

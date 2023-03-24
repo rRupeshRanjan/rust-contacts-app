@@ -5,5 +5,5 @@ use serde::Serialize;
 pub struct Contact {
     pub name: String,
     pub email: String,
-    pub phone_number: u64,
+    pub phone_number: i64,
 }

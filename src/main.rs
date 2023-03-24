@@ -3,7 +3,7 @@ use std::io;
 use std::usize;
 
 use crate::contacts_service::ContactsService;
-use crate::contacts_service::InMemoryConytactsService;
+use crate::contacts_service::SqlContactsService;
 
 const INPUT_SELECTION_MESSAGE: &str = "Choose your action -
 1. Add to contacts
@@ -24,8 +24,7 @@ fn take_input(message: &str) -> String {
 }
 
 fn main() {
-    let mut contacts = InMemoryConytactsService::new();
-
+    let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
     loop {
         let input = take_input(INPUT_SELECTION_MESSAGE);
 
@@ -36,7 +35,7 @@ fn main() {
                 let phone_number = take_input("Enter phone number:");
                 match contacts.add(name, email, phone_number) {
                     Ok(_) => println!("contact added to directory"),
-                    Err(err) => panic!("{}", err.to_string()),
+                    Err(err) => println!("{}", err.to_string()),
                 }
             }
             "2" => {
@@ -44,7 +43,7 @@ fn main() {
                 let email = take_input("Enter email:");
                 match contacts.update_email(name, email) {
                     Ok(_) => println!("updated email"),
-                    Err(err) => panic!("{}", err.to_string()),
+                    Err(err) => println!("{}", err.to_string()),
                 }
             }
             "3" => {
@@ -52,12 +51,15 @@ fn main() {
                 let phone_number = take_input("Enter phone number:");
                 match contacts.update_phone(name, phone_number) {
                     Ok(_) => println!("updated phone number"),
-                    Err(err) => panic!("{}", err.to_string()),
+                    Err(err) => println!("{}", err.to_string()),
                 }
             }
             "4" => {
                 let name = take_input("Enter name:");
-                contacts.delete(name);
+                match contacts.delete(name) {
+                    Ok(_) => println!("Contact deleted"),
+                    Err(err) => println!("{}", err.to_string()),
+                }
             }
             "5" => {
                 let page_num = take_input("Enter page number (starts from 0): ");
@@ -65,9 +67,12 @@ fn main() {
 
                 match page_num.parse::<usize>() {
                     Ok(page_num) => match page_size.parse::<usize>() {
-                        Ok(page_size) => {
-                            println!("{}", contacts.get_all(page_num, page_size));
-                        }
+                        Ok(page_size) => match contacts.get_all(page_num, page_size) {
+                            Ok(contacts) => {
+                                println!("Contact List: Page {}\n{}", page_num + 1, contacts)
+                            }
+                            Err(err) => println!("Error fetching contacts: {}", err.to_string()),
+                        },
                         Err(err) => panic!("{}", err.to_string()),
                     },
                     Err(err) => panic!("{}", err.to_string()),
@@ -75,7 +80,10 @@ fn main() {
             }
             "6" => {
                 let name = take_input("Enter name:");
-                println!("{}", contacts.get_by_name(name));
+                match contacts.get_by_name(name) {
+                    Ok(contact) => println!("Contact details: {}", contact),
+                    Err(err) => println!("Error fetching congtact: {}", err.to_string()),
+                }
             }
             _ => println!("Invalid input, please enter inputs from 1-6"),
         }
