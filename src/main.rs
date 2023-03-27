@@ -3,7 +3,7 @@ use contacts_service::contact::*;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::usize;
-use warp::{self, Filter};
+use warp::{self, http::Response, http::StatusCode, Filter};
 
 use crate::contacts_service::ContactsService;
 use crate::contacts_service::SqlContactsService;
@@ -20,23 +20,27 @@ async fn get_all_contacts(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
     match contacts.get_all(page_num, page_size) {
-        Ok(contacts) => Ok(contacts),
-        Err(_) => return Err(warp::reject::not_found()),
+        Ok(contacts) => Ok(Response::builder().status(StatusCode::OK).body(contacts)),
+        Err(err) => Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(err.to_string())),
     }
 }
 
 async fn get_contacts_by_name(name: String) -> Result<impl warp::Reply, warp::Rejection> {
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
     match contacts.get_by_name(name) {
-        Ok(contact) => Ok(contact),
-        Err(_) => return Err(warp::reject::not_found()),
+        Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
+        Err(err) => Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(err.to_string())),
     }
 }
 
 async fn delete_contact(name: String) -> Result<impl warp::Reply, warp::Rejection> {
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
     match contacts.delete(name) {
-        Ok(_) => Ok("Contact deleted"),
+        Ok(_) => Ok(Response::builder().status(StatusCode::NO_CONTENT).body("")),
         Err(_) => return Err(warp::reject::not_found()),
     }
 }
@@ -49,7 +53,7 @@ async fn create_contact(contact: Contact) -> Result<impl warp::Reply, warp::Reje
         contact.phone_number.clone().to_string(),
     ) {
         Ok(_) => match contacts.get_by_name(contact.name) {
-            Ok(contact) => Ok(contact),
+            Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
             Err(_) => return Err(warp::reject::not_found()),
         },
         Err(_) => return Err(warp::reject::not_found()),
@@ -60,7 +64,7 @@ async fn update_email(contact: UpdateEmailBody) -> Result<impl warp::Reply, warp
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
     match contacts.update_email(contact.name.clone(), contact.email.clone()) {
         Ok(_) => match contacts.get_by_name(contact.name) {
-            Ok(contact) => Ok(contact),
+            Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
             Err(_) => return Err(warp::reject::not_found()),
         },
         Err(_) => return Err(warp::reject::not_found()),
@@ -76,7 +80,7 @@ async fn update_phone_number(
         contact.phone_number.clone().to_string(),
     ) {
         Ok(_) => match contacts.get_by_name(contact.name) {
-            Ok(contact) => Ok(contact),
+            Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
             Err(_) => return Err(warp::reject::not_found()),
         },
         Err(_) => return Err(warp::reject::not_found()),
