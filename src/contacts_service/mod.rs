@@ -195,7 +195,9 @@ impl ContactsService for SqlContactsService {
             };
             serde_json::to_string(&contact).map_err(|err| ContactsError::SerdeError(err))
         } else {
-            Ok("No contact found by name".to_string())
+            Err(ContactsError::NotFoundError(
+                "No entries for this name".to_string(),
+            ))
         }
     }
 
