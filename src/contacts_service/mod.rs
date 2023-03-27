@@ -1,5 +1,5 @@
 pub(crate) mod contact;
-mod contact_error;
+pub(crate) mod contact_error;
 
 use rusqlite::{Connection, Result, ToSql};
 

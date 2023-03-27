@@ -1,5 +1,6 @@
 pub mod contacts_service;
 use contacts_service::contact::*;
+use contacts_service::contact_error::*;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::usize;
@@ -22,7 +23,7 @@ async fn get_all_contacts(
     match contacts.get_all(page_num, page_size) {
         Ok(contacts) => Ok(Response::builder().status(StatusCode::OK).body(contacts)),
         Err(err) => Ok(Response::builder()
-            .status(StatusCode::NOT_FOUND)
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
             .body(err.to_string())),
     }
 }
@@ -31,8 +32,11 @@ async fn get_contacts_by_name(name: String) -> Result<impl warp::Reply, warp::Re
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
     match contacts.get_by_name(name) {
         Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
-        Err(err) => Ok(Response::builder()
+        Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
+            .body(err.to_string())),
+        Err(err) => Ok(Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
             .body(err.to_string())),
     }
 }
@@ -41,7 +45,9 @@ async fn delete_contact(name: String) -> Result<impl warp::Reply, warp::Rejectio
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
     match contacts.delete(name) {
         Ok(_) => Ok(Response::builder().status(StatusCode::NO_CONTENT).body("")),
-        Err(_) => return Err(warp::reject::not_found()),
+        Err(_) => Ok(Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body("Internal server error")),
     }
 }
 
@@ -54,9 +60,19 @@ async fn create_contact(contact: Contact) -> Result<impl warp::Reply, warp::Reje
     ) {
         Ok(_) => match contacts.get_by_name(contact.name) {
             Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
-            Err(_) => return Err(warp::reject::not_found()),
+            Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(err.to_string())),
+            Err(err) => Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(err.to_string())),
         },
-        Err(_) => return Err(warp::reject::not_found()),
+        Err(ContactsError::InputError(err)) => Ok(Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(err)),
+        Err(err) => Ok(Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(err.to_string())),
     }
 }
 
@@ -65,9 +81,19 @@ async fn update_email(contact: UpdateEmailBody) -> Result<impl warp::Reply, warp
     match contacts.update_email(contact.name.clone(), contact.email.clone()) {
         Ok(_) => match contacts.get_by_name(contact.name) {
             Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
-            Err(_) => return Err(warp::reject::not_found()),
+            Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(err.to_string())),
+            Err(err) => Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(err.to_string())),
         },
-        Err(_) => return Err(warp::reject::not_found()),
+        Err(ContactsError::InputError(err)) => Ok(Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(err)),
+        Err(err) => Ok(Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(err.to_string())),
     }
 }
 
@@ -81,9 +107,19 @@ async fn update_phone_number(
     ) {
         Ok(_) => match contacts.get_by_name(contact.name) {
             Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
-            Err(_) => return Err(warp::reject::not_found()),
+            Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(err.to_string())),
+            Err(err) => Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(err.to_string())),
         },
-        Err(_) => return Err(warp::reject::not_found()),
+        Err(ContactsError::InputError(err)) => Ok(Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(err)),
+        Err(err) => Ok(Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(err.to_string())),
     }
 }
 

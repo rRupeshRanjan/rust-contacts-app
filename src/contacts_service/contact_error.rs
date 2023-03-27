@@ -1,4 +1,5 @@
 use std::{error, fmt};
+use warp::reject::Reject;
 
 #[derive(Debug)]
 pub enum ContactsError {
@@ -36,6 +37,7 @@ impl fmt::Display for NotFoundError {
 
 impl error::Error for ContactsError {}
 impl error::Error for NotFoundError {}
+impl Reject for ContactsError {}
 
 impl From<rusqlite::Error> for ContactsError {
     fn from(e: rusqlite::Error) -> Self {
