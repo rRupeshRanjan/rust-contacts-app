@@ -15,6 +15,30 @@ struct GetAllQueryParams {
     page_size: usize,
 }
 
+async fn handle_create_update_response(
+    mut contacts: SqlContactsService,
+    name: String,
+    response: Result<(), ContactsError>,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    match response {
+        Ok(_) => match contacts.get_by_name(name) {
+            Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
+            Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(err.to_string())),
+            Err(err) => Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(err.to_string())),
+        },
+        Err(ContactsError::InputError(err)) => Ok(Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body(err)),
+        Err(err) => Ok(Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(err.to_string())),
+    }
+}
+
 async fn get_all_contacts(
     page_num: usize,
     page_size: usize,
@@ -53,74 +77,26 @@ async fn delete_contact(name: String) -> Result<impl warp::Reply, warp::Rejectio
 
 async fn create_contact(contact: Contact) -> Result<impl warp::Reply, warp::Rejection> {
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    match contacts.add(
+    let response = contacts.add(
         contact.name.clone(),
-        contact.email.clone(),
-        contact.phone_number.clone().to_string(),
-    ) {
-        Ok(_) => match contacts.get_by_name(contact.name) {
-            Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
-            Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(err.to_string())),
-            Err(err) => Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(err.to_string())),
-        },
-        Err(ContactsError::InputError(err)) => Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(err)),
-        Err(err) => Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(err.to_string())),
-    }
+        contact.email,
+        contact.phone_number.to_string(),
+    );
+    handle_create_update_response(contacts, contact.name, response).await
 }
 
 async fn update_email(contact: UpdateEmailBody) -> Result<impl warp::Reply, warp::Rejection> {
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    match contacts.update_email(contact.name.clone(), contact.email.clone()) {
-        Ok(_) => match contacts.get_by_name(contact.name) {
-            Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
-            Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(err.to_string())),
-            Err(err) => Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(err.to_string())),
-        },
-        Err(ContactsError::InputError(err)) => Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(err)),
-        Err(err) => Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(err.to_string())),
-    }
+    let response = contacts.update_email(contact.name.clone(), contact.email);
+    handle_create_update_response(contacts, contact.name, response).await
 }
 
 async fn update_phone_number(
     contact: UpdatePhoneNumberBody,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    match contacts.update_phone(
-        contact.name.clone(),
-        contact.phone_number.clone().to_string(),
-    ) {
-        Ok(_) => match contacts.get_by_name(contact.name) {
-            Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
-            Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(err.to_string())),
-            Err(err) => Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(err.to_string())),
-        },
-        Err(ContactsError::InputError(err)) => Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(err)),
-        Err(err) => Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(err.to_string())),
-    }
+    let response = contacts.update_phone(contact.name.clone(), contact.phone_number.to_string());
+    handle_create_update_response(contacts, contact.name, response).await
 }
 
 #[tokio::main]
