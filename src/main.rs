@@ -2,7 +2,6 @@ pub mod contacts_service;
 use contacts_service::contact_error::*;
 use contacts_service::domain::*;
 use std::net::SocketAddr;
-
 use warp::{self, http::Response, http::StatusCode, Filter};
 
 use crate::contacts_service::ContactsService;
