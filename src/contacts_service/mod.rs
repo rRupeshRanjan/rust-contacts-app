@@ -1,9 +1,9 @@
-pub(crate) mod contact;
 pub(crate) mod contact_error;
+pub(crate) mod domain;
 
 use rusqlite::{Connection, Result, ToSql};
 
-use contact::Contact;
+use domain::Contact;
 use regex::Regex;
 use serde_json;
 

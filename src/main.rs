@@ -1,19 +1,12 @@
 pub mod contacts_service;
-use contacts_service::contact::*;
 use contacts_service::contact_error::*;
-use serde::{Deserialize, Serialize};
+use contacts_service::domain::*;
 use std::net::SocketAddr;
-use std::usize;
+
 use warp::{self, http::Response, http::StatusCode, Filter};
 
 use crate::contacts_service::ContactsService;
 use crate::contacts_service::SqlContactsService;
-
-#[derive(Deserialize, Serialize)]
-struct GetAllQueryParams {
-    page_num: usize,
-    page_size: usize,
-}
 
 async fn handle_create_update_response(
     mut contacts: SqlContactsService,

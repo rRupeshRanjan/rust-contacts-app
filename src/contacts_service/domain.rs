@@ -1,5 +1,5 @@
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::usize;
 
 #[derive(Serialize, Deserialize)]
 pub struct Contact {
@@ -18,4 +18,10 @@ pub struct UpdateEmailBody {
 pub struct UpdatePhoneNumberBody {
     pub name: String,
     pub phone_number: i64,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct GetAllQueryParams {
+    pub page_num: usize,
+    pub page_size: usize,
 }
