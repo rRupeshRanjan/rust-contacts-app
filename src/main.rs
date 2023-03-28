@@ -39,23 +39,13 @@ async fn handle_create_update_response(
     }
 }
 
-async fn get_all_contacts(
-    page_num: usize,
-    page_size: usize,
+async fn handle_read_response(
+    response: Result<String, ContactsError>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    match contacts.get_all(page_num, page_size) {
-        Ok(contacts) => Ok(Response::builder().status(StatusCode::OK).body(contacts)),
-        Err(err) => Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(err.to_string())),
-    }
-}
-
-async fn get_contacts_by_name(name: String) -> Result<impl warp::Reply, warp::Rejection> {
-    let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    match contacts.get_by_name(name) {
-        Ok(contact) => Ok(Response::builder().status(StatusCode::OK).body(contact)),
+    match response {
+        Ok(response_body) => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .body(response_body)),
         Err(ContactsError::NotFoundError(err)) => Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(err.to_string())),
@@ -65,9 +55,10 @@ async fn get_contacts_by_name(name: String) -> Result<impl warp::Reply, warp::Re
     }
 }
 
-async fn delete_contact(name: String) -> Result<impl warp::Reply, warp::Rejection> {
-    let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    match contacts.delete(name) {
+async fn handle_delete_response(
+    response: Result<String, ContactsError>,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    match response {
         Ok(_) => Ok(Response::builder().status(StatusCode::NO_CONTENT).body("")),
         Err(_) => Ok(Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -75,59 +66,71 @@ async fn delete_contact(name: String) -> Result<impl warp::Reply, warp::Rejectio
     }
 }
 
-async fn create_contact(contact: Contact) -> Result<impl warp::Reply, warp::Rejection> {
-    let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    let response = contacts.add(
-        contact.name.clone(),
-        contact.email,
-        contact.phone_number.to_string(),
-    );
-    handle_create_update_response(contacts, contact.name, response).await
-}
-
-async fn update_email(contact: UpdateEmailBody) -> Result<impl warp::Reply, warp::Rejection> {
-    let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    let response = contacts.update_email(contact.name.clone(), contact.email);
-    handle_create_update_response(contacts, contact.name, response).await
-}
-
-async fn update_phone_number(
-    contact: UpdatePhoneNumberBody,
-) -> Result<impl warp::Reply, warp::Rejection> {
-    let mut contacts = SqlContactsService::new().expect("Failed to create SqlContactsService");
-    let response = contacts.update_phone(contact.name.clone(), contact.phone_number.to_string());
-    handle_create_update_response(contacts, contact.name, response).await
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let get_all_contacts_route = warp::path("contacts")
         .and(warp::get())
         .and(warp::query::<GetAllQueryParams>())
-        .and_then(|params: GetAllQueryParams| get_all_contacts(params.page_num, params.page_size));
+        .and_then(|params: GetAllQueryParams| {
+            let mut contacts =
+                SqlContactsService::new().expect("Failed to create SqlContactsService");
+            let response = contacts.get_all(params.page_num, params.page_size);
+            handle_read_response(response)
+        });
 
-    let get_contact_by_name_route = warp::path!("contacts" / String)
-        .and(warp::get())
-        .and_then(|name| get_contacts_by_name(name));
+    let get_contact_by_name_route =
+        warp::path!("contacts" / String)
+            .and(warp::get())
+            .and_then(|name| {
+                let mut contacts =
+                    SqlContactsService::new().expect("Failed to create SqlContactsService");
+                let response = contacts.get_by_name(name);
+                handle_read_response(response)
+            });
 
     let delete_contact_route = warp::path!("contacts" / String)
         .and(warp::delete())
-        .and_then(|name| delete_contact(name));
+        .and_then(|name| {
+            let mut contacts =
+                SqlContactsService::new().expect("Failed to create SqlContactsService");
+            let response = contacts.delete(name);
+            handle_delete_response(response)
+        });
 
     let create_contact_route = warp::path("contact")
         .and(warp::post())
         .and(warp::body::json())
-        .and_then(create_contact);
+        .and_then(|contact: Contact| {
+            let mut contacts =
+                SqlContactsService::new().expect("Failed to create SqlContactsService");
+            let response = contacts.add(
+                contact.name.clone(),
+                contact.email,
+                contact.phone_number.to_string(),
+            );
+            handle_create_update_response(contacts, contact.name, response)
+        });
 
     let update_email_route = warp::path("update_email")
         .and(warp::put())
         .and(warp::body::json())
-        .and_then(update_email);
+        .and_then(|contact: UpdateEmailBody| {
+            let mut contacts =
+                SqlContactsService::new().expect("Failed to create SqlContactsService");
+            let response = contacts.update_email(contact.name.clone(), contact.email);
+            handle_create_update_response(contacts, contact.name, response)
+        });
 
     let update_phone_number_route = warp::path("update_phone_number")
         .and(warp::put())
         .and(warp::body::json())
-        .and_then(update_phone_number);
+        .and_then(|contact: UpdatePhoneNumberBody| {
+            let mut contacts =
+                SqlContactsService::new().expect("Failed to create SqlContactsService");
+            let response =
+                contacts.update_phone(contact.name.clone(), contact.phone_number.to_string());
+            handle_create_update_response(contacts, contact.name, response)
+        });
 
     let routes = get_all_contacts_route
         .or(get_contact_by_name_route)

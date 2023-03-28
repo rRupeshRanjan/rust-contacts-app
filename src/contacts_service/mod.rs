@@ -30,7 +30,7 @@ pub trait ContactsService {
     ) -> Result<(), ContactsError>;
     fn update_email(&mut self, name: String, email: String) -> Result<(), ContactsError>;
     fn update_phone(&mut self, name: String, phone_number: String) -> Result<(), ContactsError>;
-    fn delete(&mut self, name: String) -> Result<(), ContactsError>;
+    fn delete(&mut self, name: String) -> Result<String, ContactsError>;
     fn get_by_name(&mut self, name: String) -> Result<String, ContactsError>;
     fn get_all(&mut self, page_num: usize, page_size: usize) -> Result<String, ContactsError>;
 }
@@ -132,7 +132,10 @@ impl ContactsService for SqlContactsService {
 
         let mut stmt = self.conn.prepare(INSERT_CONTACT_QUERY)?;
         match stmt.execute(&[name, email, phone_number_as_str]) {
-            Ok(_) => Ok(()),
+            Ok(_) => {
+                println!("contact created");
+                Ok(())
+            }
             Err(err) => Err(ContactsError::SqliteError(err)),
         }
     }
@@ -149,7 +152,7 @@ impl ContactsService for SqlContactsService {
                         name
                     )));
                 }
-                println!("{} contact(s) updated", rows_affected);
+                println!("email for {} contact updated", rows_affected);
                 Ok(())
             }
             Err(err) => Err(ContactsError::SqliteError(err)),
@@ -168,17 +171,20 @@ impl ContactsService for SqlContactsService {
                         name
                     )));
                 }
-                println!("{} contact(s) updated", rows_affected);
+                println!("phone number for {} contact updated", rows_affected);
                 Ok(())
             }
             Err(err) => Err(ContactsError::SqliteError(err)),
         }
     }
 
-    fn delete(&mut self, name: String) -> Result<(), ContactsError> {
+    fn delete(&mut self, name: String) -> Result<String, ContactsError> {
         let mut stmt = self.conn.prepare(DLETE_CONTACT_QUERY)?;
-        match stmt.execute(&[name]) {
-            Ok(_) => Ok(()),
+        match stmt.execute(&[name.clone()]) {
+            Ok(_) => {
+                println!("contact deleted, name: {}", name);
+                Ok("contact deleted".to_string())
+            }
             Err(err) => Err(ContactsError::SqliteError(err)),
         }
     }
